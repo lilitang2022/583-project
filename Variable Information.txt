@@ -1,13 +1,13 @@
 Variable Information:
 
 This data contains 2 response variables and 30 explanatory variables.
-x1	WTI
-x2	Brent
-x3	Coal
+x1	WTI (Up-stream)
+x2	Brent (Up-stream)
+x3	Coal (Up-stream)
 x4	domestic (Ethylene profit)
 x5	foreign (Ethylene profit)
-x6	made of coal
-x7	made of Ethylene
+x6	made of coal (Ethylene glycol profit)
+x7	made of Ethylene (Ethylene glycol profit)
 x8	domestic (Up stream operating rate)
 x9	foreign	(Up stream operating rate)
 x10	Recycled Bottle Chips (Downstream profits)
@@ -18,18 +18,18 @@ x14	FDY (Downstream profits)
 x15	DTY (Downstream profits)
 x16	Polyester (Downstream profits)
 x17	Polyester (Downstream operating rate)
-x18	filament
-x19	Direct spinning
-x20	chip spun filament
-x21	texturing machine
-x22	weaving machine
-x23	Dyeing Factory	
+x18	filament (Downstream operating rate)
+x19	Direct spinning (Downstream operating rate)
+x20	chip spun filament (Downstream operating rate)
+x21	texturing machine (Downstream operating rate)
+x22	weaving machine (Downstream operating rate)
+x23	Dyeing Factory (Downstream operating rate)
 x24	Polyester (Inventory Downstream)
 x25	FDY (Inventory Downstream)
 x26	DTY (Inventory Downstream)
 x27	POY (Inventory Downstream)
-x28	foreign (Port)
-x29	domestic (Port)
+x28	foreign (Inventory Port)
+x29	domestic (Inventory Port)
 x30	factory stock
 
 y1	MEG spot
