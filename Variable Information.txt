@@ -1,6 +1,6 @@
 Variable Information:
 
-This data contains 1 response variable and 30 explanatory variables.
+This data contains 2 response variables and 30 explanatory variables.
 x1	WTI
 x2	Brent
 x3	Coal
@@ -17,7 +17,7 @@ x13	POY (Downstream profits)
 x14	FDY (Downstream profits)
 x15	DTY (Downstream profits)
 x16	Polyester (Downstream profits)
-x17 Polyester (Downstream operating rate)
+x17	Polyester (Downstream operating rate)
 x18	filament
 x19	Direct spinning
 x20	chip spun filament
@@ -30,6 +30,7 @@ x26	DTY (Inventory Downstream)
 x27	POY (Inventory Downstream)
 x28	foreign (Port)
 x29	domestic (Port)
-x30 factory stock
+x30	factory stock
 
-y MEG spot
+y1	MEG spot
+y2  MEG Futures
