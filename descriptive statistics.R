@@ -1,6 +1,25 @@
+getwd()
+setwd('DATA 583/583-project')
 
 # Load the data from the CSV file
 data <- read.csv("data_whole.csv", header = TRUE, check.names = FALSE)
+dim(data) # 2857, 33
+
+# remove y2, x6, x8, x9, x22, x29
+data <- data[, -c(3, 9, 11, 12, 25, 32)]
+head(data)
+
+# remove rows with missing values
+data <- na.omit(data)
+dim(data) # 352, 27
+head(data)
+
+# renme y1 to y
+names(data)[1] <- "y"
+
+# output the data to a csv file
+# write.csv(data, "data_cleaned.csv", row.names = FALSE)
+
 
 # Calculate descriptive statistics for the response variable y1
 summary(data$y1)
