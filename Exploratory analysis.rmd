@@ -54,7 +54,7 @@ summary(data)
 Let's explore the histogram of the response variable y and the explanatory variables.
 
 
-```{r}
+```{r, warning = FALSE, message = FALSE}
 # Create a histograms of the variables
 hist_y <- ggplot(data, aes(x = y)) + geom_histogram() + labs(title = "Histogram of y")
 hist_x1 <- ggplot(data, aes(x = x1)) + geom_histogram() + labs(title = "Histogram of x1")
@@ -68,11 +68,9 @@ hist_x11 <- ggplot(data, aes(x = x11)) + geom_histogram() + labs(title = "Histog
 
 grid.arrange(hist_y, hist_x1, hist_x2, hist_x3, hist_x4,
              hist_x5, hist_x7, hist_x10, hist_x11, ncol = 3)
-
 ```
 
-```{r}
-```
+
 
 
 ```{r}
@@ -92,8 +90,7 @@ grid.arrange(hist_x12, hist_x13, hist_x14, hist_x15, hist_x16,
              nrow = 3, ncol = 3)
 ```
 
-```{r}
-```
+
 
 
 ```{r}
@@ -203,6 +200,4 @@ plot(model_lasso)
 ```{r}
 
 ```
-```{r}
 
-```
