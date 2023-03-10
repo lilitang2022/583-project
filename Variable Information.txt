@@ -49,5 +49,5 @@ x28	MEG foreign Port Inventory
 x29	MEG domestic Port Inventory
 x30	MEG factory Inventory
 
-y1	MEG spot
-y2      MEG Futures
+y1	MEG spot price
+y2      MEG Futures price
