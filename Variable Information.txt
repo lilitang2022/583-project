@@ -1,6 +1,6 @@
 Variable Information:
 
-This data contains 2 response variables and 30 explanatory variables.
+This data contains  response variable and 30 explanatory variables.
 
 MEG refers to Ethylene glycol.
 
@@ -49,5 +49,5 @@ x28	MEG foreign Port Inventory
 x29	MEG domestic Port Inventory
 x30	MEG factory Inventory
 
-y1	MEG spot price
-y2      MEG Futures price
+y	MEG spot price
+

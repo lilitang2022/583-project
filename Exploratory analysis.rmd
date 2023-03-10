@@ -5,44 +5,83 @@ output:
   html_document: default
 ---
 
-```{r}
+```{r, include = FALSE}
 library(ggplot2)
 library(gridExtra)
 library(glmnet)
+library(np)
+library(nortest)
+library(MASS)
+library(glmnet)
+library(leaps)
 ```
 ```{r}
 # getwd()
-#setwd('DATA 583/583-project')
+setwd('DATA 583/583-project')
 
 # Load the data from the CSV file
-data <- read.csv("data_whole.csv", header = TRUE, check.names = FALSE)
-dim(data) # 2857, 33
-
-## data cleaning
-# remove y2, x6, x8, x9, x22, x29 because of missing values for some rows
-data <- data[, -c(3, 9, 11, 12, 25, 32)]
-
-# remove rows with missing values, obtain only weekly data, rather than daily
-data <- na.omit(data)
-dim(data) # 352, 27
-
-# renme y1 to y
-names(data)[2] <- "y"
+data <- read.csv("data_cleaned.csv", header = TRUE, check.names = FALSE)
+dim(data) # 189, 31
 
 #remove date
 data_no_date <- data[, -1]
 
 head(data)
 ```
-As the raw data has missing values, we need to remove the rows with missing values. After removing the rows with missing values, we have 352 observations and 27 variables.
-The response variable is y, which is .
-The explanatory variables are x1 to x27, which are the .
 
-The data structure is shown below.
+We aim to predict the price of ethylene glycol using the following 29 explanatory variables.
+MEG refers to ethylene glycol.
+y	MEG spot price
+
+Up-stream price of MEG
+x1	WTI: West Texas Intermediate（Crude Oil）Price
+x2	Brent: Brent Crude oil price
+x3	Coal price
+
+Up-stream(Ethylene) Profit
+x4	domestic
+x5	foreign
+
+MEG Profit
+x6	made of coal
+x7	made of Ethylene
+
+MEG operating rate
+x8	domestic
+x9	foreign
+
+Downstream profits
+x10	Recycled Bottle Chips profits
+x11	polyester chips profits
+x12	polyester bottle chip profits
+x13	POY profits
+x14	FDY profits
+x15	DTY profits
+x16	Polyester profits
+
+Downstream operating rate
+x17	Polyester
+x18	filament
+x19	Direct spinning
+x20	chip spun filament
+x21	texturing machine
+x22	weaving machine
+x23	Dyeing Factory
+
+Downstream Inventory
+x24	Polyester
+x25	FDY
+x26	DTY
+x27	POY
+
+x28	MEG foreign Port Inventory
+x29	MEG domestic Port Inventory
+x30	MEG factory Inventory
+
+The data structure is shown below. We can see that all the variables are continuous values.
 
 ```{r}
 # The structure of the data,
-# including the number of variables, their types, and the first few observations.
 str(data)
 ```
 
@@ -51,153 +90,89 @@ Here is the summary statistics of the data.
 summary(data)
 ```
 
-Let's explore the histogram of the response variable y and the explanatory variables.
-
+Let's explore the histogram of the response variable y and some of the explanatory variables.
 
 ```{r, warning = FALSE, message = FALSE}
-# Create a histograms of the variables
+# Create histograms of some of the variables
 hist_y <- ggplot(data, aes(x = y)) + geom_histogram() + labs(title = "Histogram of y")
 hist_x1 <- ggplot(data, aes(x = x1)) + geom_histogram() + labs(title = "Histogram of x1")
-hist_x2 <- ggplot(data, aes(x = x2)) + geom_histogram() + labs(title = "Histogram of x2")
-hist_x3 <- ggplot(data, aes(x = x3)) + geom_histogram() + labs(title = "Histogram of x3")
-hist_x4 <- ggplot(data, aes(x = x4)) + geom_histogram() + labs(title = "Histogram of x4")
-hist_x5 <- ggplot(data, aes(x = x5)) + geom_histogram() + labs(title = "Histogram of x5")
-hist_x7 <- ggplot(data, aes(x = x7)) + geom_histogram() + labs(title = "Histogram of x7")
-hist_x10 <- ggplot(data, aes(x = x10)) + geom_histogram() + labs(title = "Histogram of x10")
 hist_x11 <- ggplot(data, aes(x = x11)) + geom_histogram() + labs(title = "Histogram of x11")
-
-grid.arrange(hist_y, hist_x1, hist_x2, hist_x3, hist_x4,
-             hist_x5, hist_x7, hist_x10, hist_x11, ncol = 3)
-```
-
-
-
-
-```{r}
-# Create a histogram of the response variable x12, x13, x14, x15, x16, x17, x18, x19, x20
-hist_x12 <- ggplot(data, aes(x = x12)) + geom_histogram() + labs(title = "Histogram of x12")
-hist_x13 <- ggplot(data, aes(x = x13)) + geom_histogram() + labs(title = "Histogram of x13")
-hist_x14 <- ggplot(data, aes(x = x14)) + geom_histogram() + labs(title = "Histogram of x14")
-hist_x15 <- ggplot(data, aes(x = x15)) + geom_histogram() + labs(title = "Histogram of x15")
-hist_x16 <- ggplot(data, aes(x = x16)) + geom_histogram() + labs(title = "Histogram of x16")
-hist_x17 <- ggplot(data, aes(x = x17)) + geom_histogram() + labs(title = "Histogram of x17")
-hist_x18 <- ggplot(data, aes(x = x18)) + geom_histogram() + labs(title = "Histogram of x18")
-hist_x19 <- ggplot(data, aes(x = x19)) + geom_histogram() + labs(title = "Histogram of x19")
-hist_x20 <- ggplot(data, aes(x = x20)) + geom_histogram() + labs(title = "Histogram of x20")
-
-grid.arrange(hist_x12, hist_x13, hist_x14, hist_x15, hist_x16,
-             hist_x17, hist_x18, hist_x19, hist_x20,
-             nrow = 3, ncol = 3)
-```
-
-
-
-
-```{r}
-# Create a histogram of the response variable x21, x23, x24, x25, x26, x27, x28, x30
 hist_x21 <- ggplot(data, aes(x = x21)) + geom_histogram() + labs(title = "Histogram of x21")
-hist_x23 <- ggplot(data, aes(x = x23)) + geom_histogram() + labs(title = "Histogram of x23")
-hist_x24 <- ggplot(data, aes(x = x24)) + geom_histogram() + labs(title = "Histogram of x24")
-hist_x25 <- ggplot(data, aes(x = x25)) + geom_histogram() + labs(title = "Histogram of x25")
-hist_x26 <- ggplot(data, aes(x = x26)) + geom_histogram() + labs(title = "Histogram of x26")
-hist_x27 <- ggplot(data, aes(x = x27)) + geom_histogram() + labs(title = "Histogram of x27")
-hist_x28 <- ggplot(data, aes(x = x28)) + geom_histogram() + labs(title = "Histogram of x28")
-hist_x30 <- ggplot(data, aes(x = x30)) + geom_histogram() + labs(title = "Histogram of x30")
 
-grid.arrange(hist_x21, hist_x23, hist_x24, hist_x25, hist_x26,
-             hist_x27, hist_x28, hist_x30,
-             nrow = 3, ncol = 3)
+grid.arrange(hist_y, hist_x1, hist_x11, hist_x21, nrow = 2, ncol = 2)
 ```
 
+The histogram of the response variable y seems to have 3 peaks. The histogram of the explanatory variable x1 and x11 are right skewed. The histogram of the explanatory variable x21 is left skewed.
 
 
-
+Let's explore the scatterplots of the response variable y and some of the explanatory variables.
 ```{r}
 # create scatterplots of the variables x1, x2, x3, x4, x5, x7, x10, x11, x12
 scatter_x1 <- ggplot(data = data, aes(x = x1, y = y)) + geom_point() + labs(title = "Scatterplot of x1 and y")
-scatter_x2 <- ggplot(data = data, aes(x = x2, y = y)) + geom_point() + labs(title = "Scatterplot of x2 and y")
-scatter_x3 <- ggplot(data = data, aes(x = x3, y = y)) + geom_point() + labs(title = "Scatterplot of x3 and y")
-scatter_x4 <- ggplot(data = data, aes(x = x4, y = y)) + geom_point() + labs(title = "Scatterplot of x4 and y")
-scatter_x5 <- ggplot(data = data, aes(x = x5, y = y)) + geom_point() + labs(title = "Scatterplot of x5 and y")
 scatter_x7 <- ggplot(data = data, aes(x = x7, y = y)) + geom_point() + labs(title = "Scatterplot of x7 and y")
-scatter_x10 <- ggplot(data = data, aes(x = x10, y = y)) + geom_point() + labs(title = "Scatterplot of x10 and y")
-scatter_x11 <- ggplot(data = data, aes(x = x11, y = y)) + geom_point() + labs(title = "Scatterplot of x11 and y")
-scatter_x12 <- ggplot(data = data, aes(x = x12, y = y)) + geom_point() + labs(title = "Scatterplot of x12 and y")
-
-grid.arrange(scatter_x1, scatter_x2, scatter_x3, scatter_x4, scatter_x5,
-          scatter_x7, scatter_x10, scatter_x11, scatter_x12, ncol = 3, nrow = 3)
-```
-
-```{r}
-# create scatterplots of the variables x13, x14, x15, x16, x17, x18, x19, x20, x21
-scatter_x13 <- ggplot(data = data, aes(x = x13, y = y)) + geom_point() + labs(title = "Scatterplot of x13 and y")
 scatter_x14 <- ggplot(data = data, aes(x = x14, y = y)) + geom_point() + labs(title = "Scatterplot of x14 and y")
-scatter_x15 <- ggplot(data = data, aes(x = x15, y = y)) + geom_point() + labs(title = "Scatterplot of x15 and y")
-scatter_x16 <- ggplot(data = data, aes(x = x16, y = y)) + geom_point() + labs(title = "Scatterplot of x16 and y")
-scatter_x17 <- ggplot(data = data, aes(x = x17, y = y)) + geom_point() + labs(title = "Scatterplot of x17 and y")
-scatter_x18 <- ggplot(data = data, aes(x = x18, y = y)) + geom_point() + labs(title = "Scatterplot of x18 and y")
-scatter_x19 <- ggplot(data = data, aes(x = x19, y = y)) + geom_point() + labs(title = "Scatterplot of x19 and y")
-scatter_x20 <- ggplot(data = data, aes(x = x20, y = y)) + geom_point() + labs(title = "Scatterplot of x20 and y")
-scatter_x21 <- ggplot(data = data, aes(x = x21, y = y)) + geom_point() + labs(title = "Scatterplot of x21 and y")
-
-grid.arrange(scatter_x13, scatter_x14, scatter_x15, scatter_x16, scatter_x17,
-          scatter_x18, scatter_x19, scatter_x20, scatter_x21, ncol = 3, nrow = 3)
-```
-
-```{r}
-# create scatterplots of the variables x23, x24, x25, x26, x27, x28, x30
-scatter_x23 <- ggplot(data = data, aes(x = x23, y = y)) + geom_point() + labs(title = "Scatterplot of x23 and y")
-scatter_x24 <- ggplot(data = data, aes(x = x24, y = y)) + geom_point() + labs(title = "Scatterplot of x24 and y")
-scatter_x25 <- ggplot(data = data, aes(x = x25, y = y)) + geom_point() + labs(title = "Scatterplot of x25 and y")
-scatter_x26 <- ggplot(data = data, aes(x = x26, y = y)) + geom_point() + labs(title = "Scatterplot of x26 and y")
-scatter_x27 <- ggplot(data = data, aes(x = x27, y = y)) + geom_point() + labs(title = "Scatterplot of x27 and y")
-scatter_x28 <- ggplot(data = data, aes(x = x28, y = y)) + geom_point() + labs(title = "Scatterplot of x28 and y")
 scatter_x30 <- ggplot(data = data, aes(x = x30, y = y)) + geom_point() + labs(title = "Scatterplot of x30 and y")
 
-grid.arrange(scatter_x23, scatter_x24, scatter_x25, scatter_x26, scatter_x27,
-          scatter_x28, scatter_x30, ncol = 3, nrow = 3)
+grid.arrange(scatter_x1, scatter_x7, scatter_x14, scatter_x30, ncol = 2, nrow = 2)
 ```
+There seems to have a positive linear relationship between the response variable y and the explanatory variables x1, x7. And a negative relationship between y and x30. There is no obvious relationship between y and x14.
+
+Let's explore the trend of the response variable y and some of the explanatory variables over time.
 
 ```{r}
 # plot the variables versus date
 trend_y <- ggplot(data = data, aes(x = date, y = y)) + geom_point() + labs(title = "Trend of y over time")
 trend_x1 <- ggplot(data = data, aes(x = date, y = x1)) + geom_point() + labs(title = "Trend of x1 over time")
-trend_x2 <- ggplot(data = data, aes(x = date, y = x2)) + geom_point() + labs(title = "Trend of x2 over time")
-trend_x3 <- ggplot(data = data, aes(x = date, y = x3)) + geom_point() + labs(title = "Trend of x3 over time")
 trend_x4 <- ggplot(data = data, aes(x = date, y = x4)) + geom_point() + labs(title = "Trend of x4 over time")
-trend_x5 <- ggplot(data = data, aes(x = date, y = x5)) + geom_point() + labs(title = "Trend of x5 over time")
-trend_x7 <- ggplot(data = data, aes(x = date, y = x7)) + geom_point() + labs(title = "Trend of x7 over time")
-trend_x10 <- ggplot(data = data, aes(x = date, y = x10)) + geom_point() + labs(title = "Trend of x10 over time")
 trend_x11 <- ggplot(data = data, aes(x = date, y = x11)) + geom_point() + labs(title = "Trend of x11 over time")
 
-grid.arrange(trend_y, trend_x1, trend_x2, trend_x3, trend_x4, trend_x5,
-          trend_x7, trend_x10, trend_x11, ncol = 3, nrow = 3)
+grid.arrange(trend_y, trend_x1, trend_x4, trend_x11, ncol = 2, nrow = 2)
 ```
 
+The trend plots of y and x1 seem to have some similarities. The trend plots of x4 and x11 have no obvious trend.
 
-
+Let's try to plot a kernel density estimate for y using an Epanechnikov kernel.
 ```{r}
-## applications of statistical analysis techniques
-## fitting models
+bw <- npudensbw( ~ y, data = data,
+                 ckertype = "epanechnikov", bwmethod = "cv.ml")
 
+fhat <- npudens(bws = bw)
+plot(fhat)
+```
+As stated in the histogram part, the distribution of y is not normal and it seems to have 3 peaks.
+
+Let's conduct Pearson tests for normality.
+```{r}
+pearson.test(data$y)
+pearson.test(data$x11)
+```
+From the pearson chi-square normality tests, we can see that the p-value is very small for y, and large for x11.
+So we have evidence that y is not normally distributed, but x11 is normally distributed.
+
+
+Let's try a linear regression model to do diagnostics.
+```{r}
 # fit a linear regression model
 model_ls <- lm(y ~ ., data = data_no_date)
 summary(model_ls)
 ```
+From the summary output, the can see that only variables x3, x6, x7, x13, x14, x20, x22, x25, x27, x28 and x30 are significant.
+The R-squared and adjusted R-square are high, which is expected as we have lots of variables. Variable selection is needed to reduce the number of variables.
+
+Let's try to do variable selection using stepwise regression.
 ```{r}
-# fit a stepwise regression model
-model_step <- step(model_ls, direction = "both")
-summary(model_step)
+model_step <- stepAIC(model_ls, direction = "both", criterion = "bic", trace = FALSE)
+model_step
 ```
+From the stepwise model selection, 6 variables are removed from the model.
+
+Let's try to do variable selection using lasso regression.
 ```{r}
 # fit a lasso regression model
 model_lasso <- cv.glmnet(x = as.matrix(data_no_date[, -1]), y = data_no_date[, 1], alpha = 1)
-model_lasso
 
 # plot the lasso regression model
 plot(model_lasso)
 ```
-```{r}
-
-```
+Both minimum and 1se lines suggest to keep 23 variables, which is the same as the stepwise regression model.
 
