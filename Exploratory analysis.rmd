@@ -176,3 +176,11 @@ plot(model_lasso)
 ```
 Both minimum and 1se lines suggest to keep 23 variables, which is the same as the stepwise regression model.
 
+
+
+
+
+
+
+
+
