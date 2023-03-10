@@ -17,7 +17,7 @@ library(leaps)
 ```
 ```{r}
 # getwd()
-setwd('DATA 583/583-project')
+#setwd('DATA 583/583-project')
 
 # Load the data from the CSV file
 data <- read.csv("data_cleaned.csv", header = TRUE, check.names = FALSE)
@@ -155,6 +155,8 @@ Let's try a linear regression model to do diagnostics.
 # fit a linear regression model
 model_ls <- lm(y ~ ., data = data_no_date)
 summary(model_ls)
+
+plot(model_ls)
 ```
 From the summary output, the can see that only variables x3, x6, x7, x13, x14, x20, x22, x25, x27, x28 and x30 are significant.
 The R-squared and adjusted R-square are high, which is expected as we have lots of variables. Variable selection is needed to reduce the number of variables.
