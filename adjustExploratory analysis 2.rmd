@@ -1,0 +1,190 @@
+---
+title: "Project-583"
+author: "Lili Tang, Zhijia Ju"
+output: 
+  pdf_document:
+    latex_engine: xelatex
+  
+---
+
+```{r, include = FALSE}
+library(ggplot2)
+library(gridExtra)
+library(glmnet)
+library(np)
+library(nortest)
+library(MASS)
+library(glmnet)
+library(leaps)
+```
+```{r, results="hide"}
+data <- read.csv("data_cleaned.csv", header = TRUE, check.names = FALSE)
+dim(data) # 189, 31
+data_no_date <- data[, -1]
+head(data)
+```
+**We aim to predict the price of ethylene glycol using the following 29 explanatory variables.**
+MEG refers to ethylene glycol.     
+**y	MEG spot price**       
+
+**Up-stream price of MEG**            
+x1	WTI: West Texas Intermediate(Crude Oil)Price               
+x2	Brent: Brent Crude oil price                
+x3	Coal price       
+**Up-stream(Ethylene)Profit**                
+x4	domestic;  x5	foreign                                     
+
+**MEG Profit**                   
+x6	made of coal;  x7	made of Ethylene                                       
+**MEG operating rate**                   
+x8	domestic;  x9	foreign                                   
+
+**Downstream profits**                                           
+x10	Recycled Bottle Chips;  x11	polyester chips;  x12	polyester bottle chip;  x13	POY;  x14	FDY;  x15	DTY;  x16	Polyester          **Downstream operating rate**                 
+x17	Polyester; x18	filament; x19	Direct spinning;  x20	chip spun filament;  x21	texturing machine;  x22	weaving machine       
+**Downstream Inventory**                             
+x24	Polyester; x25	FDY; x26	DTY;  x27	POY                 
+
+**MEG Inventory**                    
+x28	foreign Port;  x29	domestic Port;  x30	factory                          
+
+## 1. A statistically descriptive analysis of the dataset.
+The data structure is shown below. We can see that all the variables are continuous values.
+```{r}
+str(data)
+```
+Here is the summary statistics of the response variable.
+```{r}
+summary(data$y)
+```
+Let's explore the histogram of the response variable y, and some explanatory variables.
+```{r, warning = FALSE, message = FALSE}
+hist_y <- ggplot(data, aes(x = y)) + geom_histogram() + labs(title = "Histogram of y")
+hist_x1 <- ggplot(data, aes(x = x1)) + geom_histogram() + labs(title = "Histogram of x1")
+hist_x11 <- ggplot(data, aes(x = x11)) + geom_histogram() + labs(title = "Histogram of x11")
+hist_x21 <- ggplot(data, aes(x = x21)) + geom_histogram() + labs(title = "Histogram of x21")
+grid.arrange(hist_y, hist_x1, hist_x11, hist_x21, nrow = 2, ncol = 2)
+```
+The histogram of the response variable y seems to have 3 peaks. The histogram of the explanatory variable x1 and x11 are right skewed. The histogram of the explanatory variable x21 is left skewed.
+
+Let's explore the scatter plots of the response variable y and some explanatory variables.
+```{r}
+# create scatterplots of the variables x1, x2, x3, x4, x5, x7, x10, x11, x12
+scatter_x1 <- ggplot(data = data, aes(x = x1, y = y)) + geom_point() + labs(title = "Scatterplot of x1 and y")
+scatter_x7 <- ggplot(data = data, aes(x = x7, y = y)) + geom_point() + labs(title = "Scatterplot of x7 and y")
+scatter_x14 <- ggplot(data = data, aes(x = x14, y = y)) + geom_point() + labs(title = "Scatterplot of x14 and y")
+scatter_x30 <- ggplot(data = data, aes(x = x30, y = y)) + geom_point() + labs(title = "Scatterplot of x30 and y")
+grid.arrange(scatter_x1, scatter_x7, scatter_x14, scatter_x30, ncol = 2, nrow = 2)
+```
+There seems to have a positive linear relationship between the response variable y and the explanatory variables x1, x7. And a negative relationship between y and x30. It seems reasonable because x1 represent Crude Oil Price, which is positively related to the price of y(MEG), while x30 represents the factory inventory, the higher the inventory, the lower the price.There is no obvious relationship between y and x14.
+
+Let's explore the trend of the response variable y and some explanatory variables over time.
+```{r}
+# plot the variables versus date
+trend_y <- ggplot(data = data, aes(x = date, y = y)) + geom_point() + labs(title = "Trend of y over time")
+trend_x1 <- ggplot(data = data, aes(x = date, y = x1)) + geom_point() + labs(title = "Trend of x1 over time")
+trend_x4 <- ggplot(data = data, aes(x = date, y = x4)) + geom_point() + labs(title = "Trend of x4 over time")
+trend_x11 <- ggplot(data = data, aes(x = date, y = x11)) + geom_point() + labs(title = "Trend of x11 over time")
+grid.arrange(trend_y, trend_x1, trend_x4, trend_x11, ncol = 2, nrow = 2)
+```
+The trend plots of y and x1 seem to have some similarities. The trend plots of x4 and x11 have no obvious trend.
+
+## 2. Applications of statistical analysis techniques。
+
+### kernel density
+Let's try to plot a kernel density estimate for y using an Epanechnikov kernel.
+```{r}
+par(mar = c(2, 2, 2, 2))
+bw <- npudensbw( ~ y, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+fhat <- npudens(bws = bw)
+plot(fhat, main = "Kernel density estimate for y")
+```
+
+As stated in the histogram part, the distribution of y is not normal, and it seems to have 3 peaks.
+
+Let's conduct Pearson tests for normality.
+```{r}
+pearson.test(data$y)
+```
+From the pearson chi-square normality tests, we can see that the p-value is very small for y, so we have evidence that y is not normally distributed
+
+### Linear regression
+```{r}
+model_ls <- lm(y ~ ., data = data_no_date)
+summary(model_ls)
+```
+
+From the summary output, the can see that only variables x3, x6, x7, x13, x14, x20, x22, x25, x27, x28 and x30 are significant.
+The R-squared and adjusted R-square are high, which is expected as we have lots of variables. Variable selection is needed to reduce the number of variables.
+
+Let's try to do variable selection using stepwise regression.
+```{r}
+model_step <- stepAIC(model_ls, direction = "both", criterion = "bic", trace = FALSE)
+model_step
+```
+From the stepwise model selection, 6 variables are removed from the model.
+
+```{r}
+par(mfrow=c(2,2))
+plot(model_step)
+```
+
+The residual plot shows no obvious trend. The scale-location plot shows a slightly increasing trend. The normal Q-Q plot shows that the residuals are roughly normally distributed. The leverage plot shows that there are couple potential outliers.
+
+### Lasso
+```{r}
+knitr::opts_chunk$set(fig.width=5, fig.height=4)
+model_lasso <- cv.glmnet(x = as.matrix(data_no_date[, -1]), y = data_no_date[, 1], alpha = 1)
+plot(model_lasso)
+```
+
+Both minimum and 1se lines suggest to keep 23 variables, which is the same as the stepwise model selection.
+
+## 3. Scientific questions.
+## 4. Statistical analysis techniques I will use to answer those questions.
+
+**Q1. Based on our dataset, which models can be used to forecast the price of ethylene glycol?**
+From the above analysis, linear regression model seems to be good in interpretation. R-square is 0.99 and many variables are significant. However, there is a potential over-fitting problem with so many variables included in the model.Also, as reponse variable is not normal distributed, it may violate the assumptions of linear regression. Therefore, we can use other methods such as **nonparametric local linear regression model or regression trees or random forest**.
+
+We also can consider using the **logistic regression**, but we need to convert the continuous response variable into a binary outcome by applying a threshold value. For example, if the response variable increases compared with last day or last week, then we assign it to 1, otherwise, we assign it to 0.
+
+### Nonparametric local linear regression model
+```{r}
+library(np)
+bw <- npregbw(y ~ x1 + x2 + x3 + x4 + x6 + x7 + x9 + x10 + x11 +x13 + x14 + x15 + x16 + x19 + x20 + x21 + x22 + x24 + x25 +x26 + x27 + x28 + x30,data=data_no_date,regtype="ll")
+model.ll <- npreg(bws=bw)
+summary(model.ll)
+```
+
+In nonparametric local linear regression model, R square is quite close to 1(larger than R square in linear regression), which indicates that the model is fitting the data better than linear regression.
+
+### Logistic 
+```{r, warning = FALSE, message = FALSE}
+data_logistic <- data_no_date[-1,]
+data_logistic$newy <- ifelse(diff(data_no_date$y) > 0, 1, 0)
+data_logistic$newy <- as.factor(data_logistic$newy)
+model_Log<- glm(newy ~., data=data_logistic[,-1],family =binomial)
+model_Log_step <- stepAIC(model_Log, direction = "both", criterion = "bic", trace = FALSE)
+```
+
+The variable selection helped us to reduce the number of variables(from 29 to 14), and we have a lower BIC value(from 229.3 to 206.2); Due to space limitations, we do not show results.
+
+**Q2. There are 29 variables in our dataset, how can we reduce the dimension and avoid multi-collinearity?** There are 2 methods we can consider, the first method is lasso, as used above, it can be used to reduce high-dimensional data in a model by shrinking the coefficients of irrelevant variables to zero.The other method is PCA, which aims to reduce the dimensionality of the data while retaining as much of its variance as possible.
+
+### PCA
+```{r results="hide"}
+pca <- prcomp(data_no_date[,-c(1)], scale.=TRUE)
+summary(pca)
+```
+```{r}
+var_explained <- cumsum(pca $sdev^2 / sum(pca $sdev^2))
+# Determine the number of components needed to retain at least 90% of the variance
+which.max(var_explained >= 0.9)
+```
+
+We reduce 29 variables to 11 principal components by PCA (those can explain 90% of variance).
+
+**Q3. which model is the most appropriate and accurate?**                  
+First of all, it depends on our purpose. If our priority is to interpret, linear regression, logistic regression or trees will be better. This involves examining the coefficients of the model to determine the direction and strength of the relationships between the variables. This information can be used to identify the most important variables and to generate hypotheses about the underlying mechanisms driving the relationship between the variables.
+
+If we focus more on predication, we can divide our data into training and testing datasets, using cross validation to test the model with the smallest test MSE. Usually, random forest or boosting would be better in this case. As the data is time series, we can also use ARIMA model to do prediction.
