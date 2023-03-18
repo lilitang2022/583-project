@@ -4,8 +4,48 @@ output: pdf_document
 ---
 
 
-```{r}
+```{r, include = FALSE}
+library(ggplot2)
+library(gridExtra)
+library(glmnet)
+library(np)
+library(nortest)
+library(MASS)
+library(glmnet)
+library(leaps)
+
+data <- read.csv("data_cleaned.csv", header = TRUE, check.names = FALSE)
+dim(data) #
 
 ```
+# Dataset Introduction and Hypotheses
+The dataset we are using examines how the price of ethylene glycol is related to .... Ethylene glycol is a chemical used in the production of polyester and polyurethane.
+
+
+
+
+
+# Description of the Dataset
+
+| Variable Name | Unit of Measurement | Continuous vs Discrete |
+|---------------|---------------------|------------------------|
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+|               |                     | Continuous             |
+
+
+
+
+
+
+# Regression Analysis
+
+
+# Conclusion
 
 
