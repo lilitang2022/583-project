@@ -32,20 +32,24 @@ raw_data$Inventory <- 0.25 * raw_data$x28 + 0.5 * raw_data$x29 + 0.25 * raw_data
 
 # Remove old variables and 'y', 'x23'
 cols_to_remove <- c("y", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30")
-transformed_data <- raw_data[, !(names(raw_data) %in% cols_to_remove)]
+data <- raw_data[, !(names(raw_data) %in% cols_to_remove)]
 
 # View the transformed dataset
-transformed_data <- na.omit(transformed_data)
-head(transformed_data)
-dim(transformed_data)
+data <- na.omit(data)
+head(data)
+dim(data)
 ```
 
 
 # Dataset Introduction and Hypotheses
 The dataset we are using examines how the price of Mono-ethylene glycol (MEG) is related to upstream and downstream variables. Originally, there are 29 explanatory variables with a lot of missing data. With the help of the domain knowledge, We transformed them into 8 variables using the weighted method. We will be using the new transformed variables in our analysis, including the price of crude oil and coal, upstream MEG profit, MEG profits, MEG operating rate, downstream profits, downstream operating rate, downstream inventory, and inventory. The response variable is the price of MEG. The purpose of this report is to examine how the upstream and downstream variables affect the price of MEG, and to predict the price based on the variables.
 
+The hypotheses are as follows:
+We expect that the price of MEG will be positively related to the price of crude oil and coal, the upstream MEG profit, MEG profit, downstream profits, and downstream operating rate. As the price of crude oil and coal is a measure of the cost of MEG, and the price will be higher when the cost is higher. Besides, the upstream MEG profit, MEG profit, downstream profits, and downstream operating rate are all measures of the demand of MEG, and the price will be higher when the demand is higher.
 
+We also expect that the price of MEG will be negatively related to the inventory, as the inventory is a measure of the supply of MEG, and the price will be lower when the supply is higher.
 
+We will also try to find an appropriate model to predict the price of MEG based on the variables.
 
 
 
@@ -53,17 +57,17 @@ The dataset we are using examines how the price of Mono-ethylene glycol (MEG) is
 
 # Description of the Dataset
 
-| Variable Name            | Unit of Measurement | Continuous vs Discrete |
-|--------------------------|---------------------|------------------------|
-| Price_MEG                | CNY(¥)              | Continuous             |
-| Price_crude_oil_coal     |                     | Continuous             |
-| Upstream_MEG_Profit      |                     | Continuous             |
-| MEG_Profit               | CNY(¥)              | Continuous             |
-| MEG_operating_rate       | Percentage          | Continuous             |
-| Downstream_Profits       | CNY(¥)              | Continuous             |
+| Variable Name             | Unit of Measurement | Continuous vs Discrete |
+|---------------------------|---------------------|------------------------|
+| Price_MEG                 | CNY(¥)              | Continuous             |
+| Price_crude_oil_coal      |                     | Continuous             |
+| Upstream_MEG_Profit       |                     | Continuous             |
+| MEG_Profit                | CNY(¥)              | Continuous             |
+| MEG_operating_rate        | Percentage          | Continuous             |
+| Downstream_Profits        | CNY(¥)              | Continuous             |
 | Downstream_Operating_Rate | Percentage          | Continuous             |
-| Downstream_Inventory     | 10,000 Tons         | Continuous             |
-| Inventory                | 10,000 Tons         | Continuous             |
+| Downstream_Inventory      | 10,000 Tons         | Continuous             |
+| Inventory                 | 10,000 Tons         | Continuous             |
 
 
 
