@@ -2,7 +2,7 @@ Variable Information:
 
 This data contains  response variable and 30 explanatory variables.
 
-MEG refers to Ethylene glycol.
+MEG refers to Mono Ethylene Glycol.
 
 Up-stream price of MEG
 x1	WTI: West Texas Intermediate（Crude Oil）Price

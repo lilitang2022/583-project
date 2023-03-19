@@ -14,12 +14,42 @@ library(MASS)
 library(glmnet)
 library(leaps)
 
-data <- read.csv("data_cleaned.csv", header = TRUE, check.names = FALSE)
-dim(data) #
 
+
+#setwd('DATA 583/583-project')
+raw_data <- read.csv("raw_data.csv")
+
+# Create new variables
+raw_data$Price_MEG <- raw_data$y
+raw_data$Price_crude_oil_coal <- 0.6 * raw_data$x1 + 0.4 * raw_data$x3
+raw_data$Up_stream_MEG_Profit <- 0.5 * raw_data$x4 + 0.5 * raw_data$x5
+raw_data$MEG_Profit <- 0.5 * raw_data$x6 + 0.5 * raw_data$x7
+raw_data$MEG_operating_rate <- 0.5 * raw_data$x8 + 0.5 * raw_data$x9
+raw_data$Downstream_Profits <- 1/7 * (raw_data$x10 + raw_data$x11 + raw_data$x12 + raw_data$x13 + raw_data$x14 + raw_data$x15 + raw_data$x16)
+raw_data$Downstream_Operating_Rate <- 1/6 * (raw_data$x17 + raw_data$x18 + raw_data$x19 + raw_data$x20 + raw_data$x21 + raw_data$x22)
+raw_data$Downstream_Inventory <- 0.25 * (raw_data$x24 + raw_data$x25 + raw_data$x26 + raw_data$x27)
+raw_data$Inventory <- 0.25 * raw_data$x28 + 0.5 * raw_data$x29 + 0.25 * raw_data$x30
+
+# Remove old variables and 'y', 'x23'
+cols_to_remove <- c("y", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30")
+transformed_data <- raw_data[, !(names(raw_data) %in% cols_to_remove)]
+
+# View the transformed dataset
+transformed_data <- na.omit(transformed_data)
+head(transformed_data)
+dim(transformed_data)
+
+head(raw_data)
+dim(raw_data)
 ```
+
+
 # Dataset Introduction and Hypotheses
 The dataset we are using examines how the price of ethylene glycol is related to .... Ethylene glycol is a chemical used in the production of polyester and polyurethane.
+
+The purpose of this report is to examine how the independent variables affect the price of ethylene glycol, and to predict the price of ethylene glycol based on the independent variables.
+
+We will be using a linear regression model to examine the relationship between the independent variables and the dependent variable. We will also be using a stepwise regression model to determine which variables are the most important in predicting the price of ethylene glycol.
 
 
 
@@ -41,9 +71,9 @@ The dataset we are using examines how the price of ethylene glycol is related to
 
 
 
-
-
 # Regression Analysis
+
+
 
 
 # Conclusion
