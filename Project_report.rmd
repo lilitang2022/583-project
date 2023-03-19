@@ -22,11 +22,11 @@ raw_data <- read.csv("raw_data.csv")
 # Create new variables
 raw_data$Price_MEG <- raw_data$y
 raw_data$Price_crude_oil_coal <- 0.6 * raw_data$x1 + 0.4 * raw_data$x3
-raw_data$Up_stream_MEG_Profit <- 0.5 * raw_data$x4 + 0.5 * raw_data$x5
+raw_data$Upstream_MEG_Profit <- 0.5 * raw_data$x4 + 0.5 * raw_data$x5
 raw_data$MEG_Profit <- 0.5 * raw_data$x6 + 0.5 * raw_data$x7
-raw_data$MEG_operating_rate <- 0.5 * raw_data$x8 + 0.5 * raw_data$x9
+raw_data$MEG_operating_rate <- raw_data$x8
 raw_data$Downstream_Profits <- 1/7 * (raw_data$x10 + raw_data$x11 + raw_data$x12 + raw_data$x13 + raw_data$x14 + raw_data$x15 + raw_data$x16)
-raw_data$Downstream_Operating_Rate <- 1/6 * (raw_data$x17 + raw_data$x18 + raw_data$x19 + raw_data$x20 + raw_data$x21 + raw_data$x22)
+raw_data$Downstream_Operating_Rate <- 1/6 * (raw_data$x17 + raw_data$x18 + raw_data$x19 + raw_data$x20 + raw_data$x21 + raw_data$x22)/100
 raw_data$Downstream_Inventory <- 0.25 * (raw_data$x24 + raw_data$x25 + raw_data$x26 + raw_data$x27)
 raw_data$Inventory <- 0.25 * raw_data$x28 + 0.5 * raw_data$x29 + 0.25 * raw_data$x30
 
@@ -38,18 +38,14 @@ transformed_data <- raw_data[, !(names(raw_data) %in% cols_to_remove)]
 transformed_data <- na.omit(transformed_data)
 head(transformed_data)
 dim(transformed_data)
-
-head(raw_data)
-dim(raw_data)
 ```
 
 
 # Dataset Introduction and Hypotheses
-The dataset we are using examines how the price of ethylene glycol is related to .... Ethylene glycol is a chemical used in the production of polyester and polyurethane.
+The dataset we are using examines how the price of Mono-ethylene glycol (MEG) is related to upstream and downstream variables. Originally, there are 29 explanatory variables with a lot of missing data. With the help of the domain knowledge, We transformed them into 8 variables using the weighted method. We will be using the new transformed variables in our analysis, including the price of crude oil and coal, upstream MEG profit, MEG profits, MEG operating rate, downstream profits, downstream operating rate, downstream inventory, and inventory. The response variable is the price of MEG. The purpose of this report is to examine how the upstream and downstream variables affect the price of MEG, and to predict the price based on the variables.
 
-The purpose of this report is to examine how the independent variables affect the price of ethylene glycol, and to predict the price of ethylene glycol based on the independent variables.
 
-We will be using a linear regression model to examine the relationship between the independent variables and the dependent variable. We will also be using a stepwise regression model to determine which variables are the most important in predicting the price of ethylene glycol.
+
 
 
 
@@ -57,16 +53,17 @@ We will be using a linear regression model to examine the relationship between t
 
 # Description of the Dataset
 
-| Variable Name | Unit of Measurement | Continuous vs Discrete |
-|---------------|---------------------|------------------------|
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
-|               |                     | Continuous             |
+| Variable Name            | Unit of Measurement | Continuous vs Discrete |
+|--------------------------|---------------------|------------------------|
+| Price_MEG                | CNY(¥)              | Continuous             |
+| Price_crude_oil_coal     |                     | Continuous             |
+| Upstream_MEG_Profit      |                     | Continuous             |
+| MEG_Profit               | CNY(¥)              | Continuous             |
+| MEG_operating_rate       | Percentage          | Continuous             |
+| Downstream_Profits       | CNY(¥)              | Continuous             |
+| Downstream_Operating_Rate | Percentage          | Continuous             |
+| Downstream_Inventory     | 10,000 Tons         | Continuous             |
+| Inventory                | 10,000 Tons         | Continuous             |
 
 
 
