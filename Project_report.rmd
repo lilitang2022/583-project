@@ -18,6 +18,8 @@ library(cowplot)
 library(corrplot)
 library(knitr)
 library(mgcv)
+library(randomForest)
+library(gbm)
 #library(rgl)
 
 #setwd('DATA 583/583-project')
@@ -203,22 +205,12 @@ summary(np_local_lm)
 
 result <- npsigtest(np_local_lm)
 ```
-After fitting the nonparametric local linear regression model, the summary of the model shows the R-squared is 0.997, which raises the concern of over-fitting. We then performed the consistent nonparametric test of significance, we found that the p-value of the price of crude oil and coal and MEG profit are extremely small, which means that they are significant. The p-value of the price of Upstream MEG profit, downstream operating rate and inventory are close to the 0.05 significance level, so we decided to drop them from the model. All the other variables are not significant according to the test.
+After fitting the nonparametric local linear regression model, the summary of the model shows the R-squared is 0.997, which raises the concern of over-fitting. We then performed the consistent nonparametric test of significance, we found that the p-value of the price of crude oil and coal, upstream MEG profit, MEG profit, MEG operating rate are smaller than 0.05, which means they are significant. All the other variables are not significant according to the test.
 
 
-```{r, include = FALSE}
-set.seed(8888)
-bw <- npregbw(Price_MEG ~ Price_crude_oil_coal + MEG_Profit,
-              data = data, regtype = "ll", bwmethod = "cv.aic")
-np_local_lm_reduced <- npreg(bws = bw)
-summary(np_local_lm_reduced)
-
-result <- npsigtest(np_local_lm_reduced)
-
-```
 ## Generalized additive model
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
-gam_model <- gam(Price_MEG ~ s(Price_crude_oil_coal) + s(MEG_Profit) ,
+gam_model <- gam(Price_MEG ~ s(Price_crude_oil_coal) + s(MEG_Profit),
                  data = data, family = gaussian)
 #summary(gam_model)
 
@@ -254,6 +246,22 @@ This partial effect plots in Figure 4 can show the relationships between the res
 
 Both plots show that the Price of MEG increases as the Price of crude oil and coal, and MEG profit increase. The right plot shows the relationship between the Price of MEG and the MEG profit is more linear compared to the left plot. The left plot also has more uncertainty in the fitted smooth function, which means that the relationship between the Price of MEG and the Price of crude oil and coal is more complex.
 
+## Variable importance
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+# Random forest
+rf <- randomForest(Price_MEG ~ ., data = data[,-1], importance = T)
+varImpPlot(rf)
+title(sub = "Figure 5: Variable importance plot for random forest",
+      cex.sub = 1, line = 4)
+
+boosting <-  gbm(Price_MEG ~ ., data = data[,-1], distribution = "gaussian",
+                 n.trees = 10000, interaction.depth = 6, shrinkage = 0.03, bag.fraction = 0.8)
+summary(boosting)
+```
+We check the variable importance using random forest and boosting. Both results show that inventory and MEG profit are the 2 most important variables, followed by the Price of crude oil and coal. This results agree with the nonparametric local linear regression model that MEG profit and price of crude oil and coal are important variables, but inventory is not significant in the nonparametric local linear regression model.
+
+Overall, for the purpose of variable selection, if we would like to keep 2 variables, we would choose MEG profit and inventory. If we would like to keep 3 variables, we would choose MEG profit, inventory, and the price of crude oil and coal.
 
 ##
 
