@@ -16,6 +16,9 @@ library(leaps)
 library(grid)
 library(cowplot)
 library(corrplot)
+library(knitr)
+library(mgcv)
+#library(rgl)
 
 #setwd('DATA 583/583-project')
 raw_data <- read.csv("raw_data.csv")
@@ -71,15 +74,6 @@ plot(npudens(bws = bw5), main = "Kernel density estimate for Inverse Log Price o
 cols_to_remove <- c("log_Price_MEG", "sqrt_Price_MEG", "inv_Price_MEG", "inv_log_Price_MEG")
 data <- data[, !(names(data) %in% cols_to_remove)]
 
-# Check correlation between variables and plot the correlation plot with coefficients displayed
-corrplot(cor(data[, -1]), method = "color", type = "upper",
-         addCoef.col = "black", # Color of the correlation coefficients
-         number.cex = 0.8,      # Font size of the correlation coefficients
-         tl.col = "black",      # Color of the variable names
-         tl.srt = 45,           # Text rotation angle for variable names
-         tl.cex = 0.8,          # Font size of the variable names
-         diag = FALSE)          # Do not display diagonal elements
-
 
 ```
 
@@ -96,7 +90,17 @@ We will also try to find an appropriate model to predict the price of MEG based 
 
 
 # Description of the Dataset
+```{r, echo=FALSE}
+# Create a data frame with the information
+df <- data.frame(
+  Variable_Name = c("date", "Price_MEG", "Price_crude_oil_coal", "Upstream_MEG_Profit", "MEG_Profit", "MEG_operating_rate", "Downstream_Profits", "Downstream_Operating_Rate", "Downstream_Inventory", "Inventory"),
+  Unit_of_Measurement = c("YYYY/M/D", "CNY()/ton", "USD()/barrel", "CNY()/ton", "CNY()/ton", "Percentage", "CNY()/ton", "Percentage", "10,000 Tons", "10,000 Tons"),
+  Continuous_vs_Discrete = c("Discrete", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous")
+)
 
+# Print the table using kable
+#kable(df, caption = "Table 1: Description of the variables")
+```
 | Variable Name             | Unit of Measurement | Continuous vs Discrete |
 |---------------------------|---------------------|------------------------|
 | date                      | YYYY/M/D            | Discrete               |
@@ -109,7 +113,7 @@ We will also try to find an appropriate model to predict the price of MEG based 
 | Downstream_Operating_Rate | Percentage          | Continuous             |
 | Downstream_Inventory      | 10,000 Tons         | Continuous             |
 | Inventory                 | 10,000 Tons         | Continuous             |
-                   Table 1: Description of the variables
+                       Table 1: Description of the variables
 
 
 As stated from the Table 1 above, the dataset contains 10 variables. The first variable is the date. Price of MEG is the response variable. All the other variables are explanatory variables. The date is a discrete variable, and the rest of the variables are continuous variables. The dataset collected weekly from 2018/1/5 to 2022/11/4, and there are 239 observations in this dataset. The dataset is collected from the Lili's previous employer, and Lili is allowed to use the dataset for this project.
@@ -119,17 +123,19 @@ As stated from the Table 1 above, the dataset contains 10 variables. The first v
 # Regression Analysis
 ## Normality check for the response variable
 We conduct a kernel density estimate for Price of MEG using an Epanechnikov kernel. The Epanechnikov kernel is a nonparametric kernel that is used to estimate the probability density function of a random variable.
-```{r, include = FALSE}
+```{r, echo = FALSE}
+options(np.messages=FALSE)
+
 # Apply kernel density estimate for Price_MEG using an Epanechnikov kernel.
 bw1 <- npudensbw( ~ Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
 plot(npudens(bws = bw1), main = "Kernel density estimate for Price of MEG",
      xlab = "Price of MEG",
-     cex.lab = 0.9, cex.main = 0.9, cex.axis = 0.9)
-title(sub = "Figure 1: The kernel plot clearly shows the distribution of the response variable is not normal.",
-      cex.sub = 1.2, line = 4)
+     cex.lab = 0.8, cex.main = 0.9, cex.axis = 0.8)
+title(sub = "Figure 1: The kernel plot clearly shows the distribution of the\n response variable is not normal.",
+      cex.sub = 0.8, line = 5)
 ```
 Figure 1 clearly shows the distribution of the response variable is not normal. We also conduct a Pearson test for normality. With an extremely small p-value, we reject the null hypothesis that the response variable is normally distributed. Therefore, we tried to transform the response variable to make it more normal first.
-```{r, include = FALSE}
+```{r, echo = FALSE}
 # Create individual ggplot objects
 log_Price_MEG_plot <- ggplot(data, aes(x = log(Price_MEG))) +
   geom_density() +
@@ -154,7 +160,7 @@ inv_log_Price_MEG_plot <- ggplot(data, aes(x = 1 / log(Price_MEG))) +
 # Create the caption with centered alignment
 caption <- ggdraw() + draw_label(
   "Figure 2: Density plots for different transformations of Price of MEG.",
-   x = 1, hjust = 0.5, vjust = 1, size = 13)
+   x = 1, hjust = 0.5, vjust = 1, size = 12)
 
 # Arrange the plots in a grid layout with the caption
 plot_grid(log_Price_MEG_plot, sqrt_Price_MEG_plot, inv_Price_MEG_plot, inv_log_Price_MEG_plot, caption,
@@ -162,11 +168,13 @@ plot_grid(log_Price_MEG_plot, sqrt_Price_MEG_plot, inv_Price_MEG_plot, inv_log_P
 ```
 
 
-As shown on Figure 2, after using log, square root, inverse transformation, and inverse log transformation, we found that all of them can not handle the skewness and multi-peaks of the response variable. So we decided that nonparametric regression is the best choice for this dataset.
+As shown in Figure 2, after using log, square root, inverse transformation, and inverse log transformation, we found that all of them can not handle the skewness and multi-peaks of the response variable. So we decided that nonparametric regression is the best choice for this dataset.
+
+## Check the correlation between variables
 Before fitting a nonparametric regression model, we need to check the correlation between the response variable and the explanatory variables.
 
 
-```{r, include = FALSE}
+```{r, echo = FALSE}
 # Check correlation between variables and plot the correlation plot with coefficients displayed
 corrplot(cor(data[, -1]), method = "color", type = "upper",
          addCoef.col = "black", # Color of the correlation coefficients
@@ -183,9 +191,73 @@ mtext("Figure 3: Correlation plot with coefficients between variables",
 
 Figure 3 shows that the price of MEG is positively highly correlated with MEG profit and inventory, and has almost no correlation with the price of crude oil and coal. Surprisingly, we expected that the price of MEG will be positively correlated with the price of crude oil and coal, and negatively correlated with the inventory.
 
+## Nonparametric local linear regression
+```{r, include = FALSE}
+options(np.messages=FALSE)
+
+set.seed(8888)
+bw <- npregbw(Price_MEG ~ Price_crude_oil_coal + Upstream_MEG_Profit + MEG_Profit + MEG_operating_rate + Downstream_Profits + Downstream_Operating_Rate + Downstream_Inventory + Inventory,
+              data = data, regtype = "ll", bwmethod = "cv.aic")
+np_local_lm <- npreg(bws = bw)
+summary(np_local_lm)
+
+result <- npsigtest(np_local_lm)
+```
+After fitting the nonparametric local linear regression model, the summary of the model shows the R-squared is 0.997, which raises the concern of over-fitting. We then performed the consistent nonparametric test of significance, we found that the p-value of the price of crude oil and coal and MEG profit are extremely small, which means that they are significant. The p-value of the price of Upstream MEG profit, downstream operating rate and inventory are close to the 0.05 significance level, so we decided to drop them from the model. All the other variables are not significant according to the test.
 
 
+```{r, include = FALSE}
+set.seed(8888)
+bw <- npregbw(Price_MEG ~ Price_crude_oil_coal + MEG_Profit,
+              data = data, regtype = "ll", bwmethod = "cv.aic")
+np_local_lm_reduced <- npreg(bws = bw)
+summary(np_local_lm_reduced)
 
+result <- npsigtest(np_local_lm_reduced)
+
+```
+## Generalized additive model
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+gam_model <- gam(Price_MEG ~ s(Price_crude_oil_coal) + s(MEG_Profit) ,
+                 data = data, family = gaussian)
+#summary(gam_model)
+
+par(mfrow=c(1,2))
+# Plot for Price_crude_oil_coal
+plot(gam_model, select = 1, xlab = "Price crude oil coal", ylab = "Partial effect")
+# Plot for MEG_Profit
+plot(gam_model, select = 2, xlab = "MEG Profit", ylab = "Partial effect")
+
+title(sub = "Figure 4: Marginal splines for Price crude oil coal and MEG Profit",
+      cex.sub = 1, line = 4)
+
+
+# # Construct a 3D plot
+# x1 <- seq(from = 200, to = 1000, by = 10)
+# x2 <- seq(from = -2000, to = 3000, by = 50)
+# x_grid <- data.frame(expand.grid(Price_crude_oil_coal = x1, MEG_Profit = x2))
+#
+# gam_pred <- predict(gam_model ,newdata = x_grid)
+# surface <-  matrix(gam_pred, nrow=length(x1))
+#
+# open3d()
+# persp3d(x = x1, y = x2,
+#         z = surface, theta = 30, phi = 30, expand = 0.5,
+#         col = "orange", xlab = "Price crude oil coal",
+#         ylab = "MEG Profit", zlab = "Predicted Price MEG")
+# points3d(data$Price_crude_oil_coal ~ data$MEG_Profit + data$Price_MEG, col="blue")
+```
+
+We fitted a generalized additive model with the Price of MEG as the response variable and the Price of crude oil and coal and MEG profit as the explanatory variables. The summary of the model shows that the adjusted R-squared is 0.945, which is similar to the nonparametric local linear regression model.
+
+This partial effect plots in Figure 4 can show the relationships between the response variable and the explanatory variable, while accounting for the effect of the other explanatory variable.
+
+Both plots show that the Price of MEG increases as the Price of crude oil and coal, and MEG profit increase. The right plot shows the relationship between the Price of MEG and the MEG profit is more linear compared to the left plot. The left plot also has more uncertainty in the fitted smooth function, which means that the relationship between the Price of MEG and the Price of crude oil and coal is more complex.
+
+
+##
+
+##
 
 
 # Conclusion
