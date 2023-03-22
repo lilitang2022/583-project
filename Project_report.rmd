@@ -20,6 +20,7 @@ library(knitr)
 library(mgcv)
 library(randomForest)
 library(gbm)
+library(car)
 #library(rgl)
 
 #setwd('DATA 583/583-project')
@@ -193,6 +194,16 @@ mtext("Figure 3: Correlation plot with coefficients between variables",
 
 Figure 3 shows that the price of MEG is positively highly correlated with MEG profit and inventory, and has almost no correlation with the price of crude oil and coal. Surprisingly, we expected that the price of MEG will be positively correlated with the price of crude oil and coal, and negatively correlated with the inventory.
 
+## Check multicollinearity
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+lm_model <- lm(Price_MEG ~ Price_crude_oil_coal + Upstream_MEG_Profit + MEG_Profit + MEG_operating_rate + Downstream_Profits + Downstream_Operating_Rate + Downstream_Inventory + Inventory,
+               data = data)
+
+vif_values <- vif(lm_model)
+```
+The results show that the VIF values are all smaller than 5, except for the VIF value of the MEG Profit, which is 5.11. It indicates that the multicollinearity is not a potential big issue in this dataset, but still we need to be careful when interpreting the results.
+
+
 ## Nonparametric local linear regression
 ```{r, include = FALSE}
 options(np.messages=FALSE)
@@ -207,44 +218,6 @@ result <- npsigtest(np_local_lm)
 ```
 After fitting the nonparametric local linear regression model, the summary of the model shows the R-squared is 0.997, which raises the concern of over-fitting. We then performed the consistent nonparametric test of significance, we found that the p-value of the price of crude oil and coal, upstream MEG profit, MEG profit, MEG operating rate are smaller than 0.05, which means they are significant. All the other variables are not significant according to the test.
 
-
-## Generalized additive model
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
-gam_model <- gam(Price_MEG ~ s(Price_crude_oil_coal) + s(MEG_Profit),
-                 data = data, family = gaussian)
-#summary(gam_model)
-
-par(mfrow=c(1,2))
-# Plot for Price_crude_oil_coal
-plot(gam_model, select = 1, xlab = "Price crude oil coal", ylab = "Partial effect")
-# Plot for MEG_Profit
-plot(gam_model, select = 2, xlab = "MEG Profit", ylab = "Partial effect")
-
-title(sub = "Figure 4: Marginal splines for Price crude oil coal and MEG Profit",
-      cex.sub = 1, line = 4)
-
-
-# # Construct a 3D plot
-# x1 <- seq(from = 200, to = 1000, by = 10)
-# x2 <- seq(from = -2000, to = 3000, by = 50)
-# x_grid <- data.frame(expand.grid(Price_crude_oil_coal = x1, MEG_Profit = x2))
-#
-# gam_pred <- predict(gam_model ,newdata = x_grid)
-# surface <-  matrix(gam_pred, nrow=length(x1))
-#
-# open3d()
-# persp3d(x = x1, y = x2,
-#         z = surface, theta = 30, phi = 30, expand = 0.5,
-#         col = "orange", xlab = "Price crude oil coal",
-#         ylab = "MEG Profit", zlab = "Predicted Price MEG")
-# points3d(data$Price_crude_oil_coal ~ data$MEG_Profit + data$Price_MEG, col="blue")
-```
-
-We fitted a generalized additive model with the Price of MEG as the response variable and the Price of crude oil and coal and MEG profit as the explanatory variables. The summary of the model shows that the adjusted R-squared is 0.945, which is similar to the nonparametric local linear regression model.
-
-This partial effect plots in Figure 4 can show the relationships between the response variable and the explanatory variable, while accounting for the effect of the other explanatory variable.
-
-Both plots show that the Price of MEG increases as the Price of crude oil and coal, and MEG profit increase. The right plot shows the relationship between the Price of MEG and the MEG profit is more linear compared to the left plot. The left plot also has more uncertainty in the fitted smooth function, which means that the relationship between the Price of MEG and the Price of crude oil and coal is more complex.
 
 ## Variable importance
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
@@ -263,10 +236,55 @@ We check the variable importance using random forest and boosting. Both results 
 
 Overall, for the purpose of variable selection, if we would like to keep 2 variables, we would choose MEG profit and inventory. If we would like to keep 3 variables, we would choose MEG profit, inventory, and the price of crude oil and coal.
 
-##
+## Generalized additive model
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+gam_model <- gam(Price_MEG ~  s(MEG_Profit) + s(Inventory),
+                 data = data, family = Gamma(link = "log"))
+#summary(gam_model)
 
-##
+par(mfrow=c(1,2))
+# Plot for MEG_Profit
+plot(gam_model, select = 1, xlab = "MEG Profit", ylab = "Partial effect")
+# Plot for Inventory
+plot(gam_model, select = 2, xlab = "Inventory", ylab = "Partial effect")
 
+title(sub = "Figure 4: Marginal splines for Price crude oil coal and MEG Profit",
+      cex.sub = 1, line = 4)
+
+# qqnorm(resid(gam_model))
+# qqline(resid(gam_model))
+
+# # Construct a 3D plot
+# x1 <- seq(from = 200, to = 1000, by = 10)
+# x2 <- seq(from = -2000, to = 3000, by = 50)
+# x_grid <- data.frame(expand.grid(Price_crude_oil_coal = x1, MEG_Profit = x2))
+#
+# gam_pred <- predict(gam_model ,newdata = x_grid)
+# surface <-  matrix(gam_pred, nrow=length(x1))
+#
+# open3d()
+# persp3d(x = x1, y = x2,
+#         z = surface, theta = 30, phi = 30, expand = 0.5,
+#         col = "orange", xlab = "Price crude oil coal",
+#         ylab = "MEG Profit", zlab = "Predicted Price MEG")
+# points3d(data$Price_crude_oil_coal ~ data$MEG_Profit + data$Price_MEG, col="blue")
+```
+We fitted a generalized additive model with the Price of MEG as the response variable, and MEG profit, Inventory as the explanatory variables. The summary of the model shows that the adjusted R-squared is 0.918, which is similar to the nonparametric local linear regression model.
+
+This partial effect plots in Figure 4 can show the relationships between the response variable and the explanatory variable, while accounting for the effect of the other explanatory variable.
+
+Both plots show that the Price of MEG increases as the MEG profit and Inventory increase. The plots show uncertainty in the fitted smooth function, which means that the relationship between the response variable and the explanatory variable is more complex than a linear relationship. And the estimated degree of freedom for the two variables are larger than 3, which means that the relationship between the response variable and the explanatory variable is non-linear.
+
+
+## Prediction
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+```
+
+## Logistic regression (time permitting?)
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+```
 
 # Conclusion
 
