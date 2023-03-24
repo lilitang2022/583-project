@@ -1,0 +1,491 @@
+---
+title: "583 Project Report"
+output: pdf_document
+---
+
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+library(ggplot2)
+library(gridExtra)
+library(glmnet)
+library(np)
+library(nortest)
+library(MASS)
+library(glmnet)
+library(leaps)
+library(grid)
+library(cowplot)
+library(corrplot)
+library(knitr)
+library(mgcv)
+library(randomForest)
+library(gbm)
+library(car)
+#library(rgl)
+
+#setwd('DATA 583/583-project')
+raw_data <- read.csv("raw_data.csv")
+
+# Create new variables
+raw_data$Price_MEG <- raw_data$y
+raw_data$Price_crude_oil_coal <- 0.6 * raw_data$x1 + 0.4 * raw_data$x3
+raw_data$Upstream_MEG_Profit <- 0.5 * raw_data$x4 + 0.5 * raw_data$x5
+raw_data$MEG_Profit <- 0.5 * raw_data$x6 + 0.5 * raw_data$x7
+raw_data$MEG_operating_rate <- raw_data$x8
+raw_data$Downstream_Profits <- 1/7 * (raw_data$x10 + raw_data$x11 + raw_data$x12 + raw_data$x13 + raw_data$x14 + raw_data$x15 + raw_data$x16)
+raw_data$Downstream_Operating_Rate <- 1/6 * (raw_data$x17 + raw_data$x18 + raw_data$x19 + raw_data$x20 + raw_data$x21 + raw_data$x22)/100
+raw_data$Downstream_Inventory <- 0.25 * (raw_data$x24 + raw_data$x25 + raw_data$x26 + raw_data$x27)
+raw_data$MEG_Inventory <- 0.7 * raw_data$x29 + 0.3 * raw_data$x30
+
+# Remove old variables and 'y', 'x23'
+cols_to_remove <- c("y", "x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "x9", "x10", "x11", "x12", "x13", "x14", "x15", "x16", "x17", "x18", "x19", "x20", "x21", "x22", "x23", "x24", "x25", "x26", "x27", "x28", "x29", "x30")
+data <- raw_data[, !(names(raw_data) %in% cols_to_remove)]
+data$date <- as.Date(data$date)
+
+
+# View the transformed dataset
+data <- na.omit(data)
+head(data)
+dim(data)
+
+# Apply kernel density estimate for Price_MEG using an Epanechnikov kernel.
+bw1 <- npudensbw( ~ Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw1), main = "Kernel density estimate for Price of MEG")
+
+# Conduct Pearson tests for normality.
+pearson.test(data$Price_MEG)
+
+# Apply log transformation to the response variable
+data$log_Price_MEG <- log(data$Price_MEG)
+bw2 <- npudensbw( ~ log_Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw2), main = "Kernel density estimate for Log Price of MEG")
+
+# Apply square root transformation to the response variable
+data$sqrt_Price_MEG <- sqrt(data$Price_MEG)
+bw3 <- npudensbw( ~ sqrt_Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw3), main = "Kernel density estimate for Square Root Price of MEG")
+
+# Apply inverse transformation to the response variable
+data$inv_Price_MEG <- 1/data$Price_MEG
+bw4 <- npudensbw( ~ inv_Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw4), main = "Kernel density estimate for Inverse Price of MEG")
+
+# Apply inverse log transformation to the response variable
+data$inv_log_Price_MEG <- 1/data$log_Price_MEG
+bw5 <- npudensbw( ~ inv_log_Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw5), main = "Kernel density estimate for Inverse Log Price of MEG")
+
+# Drop the transformed response variables
+cols_to_remove <- c("log_Price_MEG", "sqrt_Price_MEG", "inv_Price_MEG", "inv_log_Price_MEG")
+data <- data[, !(names(data) %in% cols_to_remove)]
+
+
+
+```
+
+
+# Dataset Introduction and Hypotheses
+The dataset we are using examines how the price of Mono-ethylene glycol (MEG) is related to upstream and downstream variables. Originally, there are 29 explanatory variables with a lot of missing data. With the help of the domain knowledge, We transformed them into 8 variables using the weighted method from the aspects of supply,demand,profit and inventory. We will use the new transformed variables in our analysis, including the price of crude oil and coal, upstream MEG profit, MEG profits, MEG operating rate, downstream profits, downstream operating rate, downstream inventory, and MEG inventory. The response variable is the price of MEG. The purpose of this report is to examine how the variables affect the price of MEG, and to predict the price trend using appropriate models.
+
+The hypotheses are as follows:
+We expect that the price of MEG will be positively related to the price of crude oil and coal, the upstream MEG profit, MEG profit, downstream profits, and downstream operating rate. As the price of crude oil, coal and upstream MEG profit are measures of the cost of MEG, the price will be higher when the cost is higher. Besides, downstream profits and downstream operating rate are all measures of the demand of MEG, and the price will be higher when the demand is higher.As for the MEG profit, which is the overall reflection of supply and demand performance.The better performance(strong demand or short supply),the higher profit, therefore, we expect the price will be higher when MEG profit is higher
+
+We also expect that the price of MEG will be negatively related to the inventory and MEG_operating_rate, as both of them are measures of the supply of MEG, and the price will be lower when the supply is higher.
+
+
+# Description of the Dataset
+```{r, echo=FALSE}
+# Create a data frame with the information
+df <- data.frame(
+  Variable_Name = c("date", "Price_MEG", "Price_crude_oil_coal", "Upstream_MEG_Profit", "MEG_Profit", "MEG_operating_rate", "Downstream_Profits", "Downstream_Operating_Rate", "Downstream_Inventory", "MEG_Inventory"),
+  Unit_of_Measurement = c("YYYY/M/D", "CNY()/ton", "USD()/barrel", "CNY()/ton", "CNY()/ton", "Percentage", "CNY()/ton", "Percentage", "10,000 Tons", "10,000 Tons"),
+  Continuous_vs_Discrete = c("Discrete", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous", "Continuous")
+)
+
+# Print the table using kable
+#kable(df, caption = "Table 1: Description of the variables")
+```
+| Variable Name             | Unit of Measurement | Continuous vs Discrete |
+|---------------------------|---------------------|------------------------|
+| date                      | YYYY/M/D            | Discrete               |
+| Price_MEG                 | CNY(¥)/ton          | Continuous             |
+| Price_crude_oil_coal      | USD($)/barrel       | Continuous             |
+| Upstream_MEG_Profit       | CNY(¥)/ton          | Continuous             |
+| MEG_Profit                | CNY(¥)/ton          | Continuous             |
+| MEG_operating_rate        | Percentage          | Continuous             |
+| Downstream_Profits        | CNY(¥)/ton          | Continuous             |
+| Downstream_Operating_Rate | Percentage          | Continuous             |
+| Downstream_Inventory      | 10,000 Tons         | Continuous             |
+| MEG_Inventory             | 10,000 Tons         | Continuous             |
+                       Table 1: Description of the variables
+
+
+As stated from the Table 1 above, the dataset contains 10 variables. The first variable is the date. Price of MEG is the response variable. All the other variables are explanatory variables. The date is a discrete variable, and the rest of the variables are continuous variables. The dataset collected weekly from 2018/1/5 to 2022/11/4, and there are 239 observations in this dataset. The dataset is collected from the Lili's previous employer, and Lili is allowed to use the dataset for this project.
+
+
+# Regression Analysis
+## Normality check for the response variable and residuals
+We conduct a kernel density estimate for Price of MEG using an Epanechnikov kernel. The Epanechnikov kernel is a nonparametric kernel that is used to estimate the probability density function of a random variable.
+```{r, echo = FALSE}
+options(np.messages=FALSE)
+
+# Apply kernel density estimate for Price_MEG using an Epanechnikov kernel.
+bw1 <- npudensbw( ~ Price_MEG, data = data, ckertype = "epanechnikov", bwmethod = "cv.ml")
+plot(npudens(bws = bw1), main = "Kernel density estimate for Price of MEG",
+     xlab = "Price of MEG",
+     cex.lab = 0.8, cex.main = 0.9, cex.axis = 0.8)
+title(sub = "Figure 1: The kernel plot clearly shows the distribution of the\n response variable is not normal.",
+      cex.sub = 0.8, line = 5)
+```
+Figure 1 clearly shows the distribution of the response variable is not normal. We also conduct a Pearson test for normality. With an extremely small p-value, we reject the null hypothesis that the response variable is normally distributed. Therefore, we tried to transform the response variable to make it more normal first.
+```{r, echo = FALSE}
+# Create individual ggplot objects
+log_Price_MEG_plot <- ggplot(data, aes(x = log(Price_MEG))) +
+  geom_density() +
+  labs(title = "Density of Log Price of MEG",
+       x = "Log Price of MEG")
+
+sqrt_Price_MEG_plot <- ggplot(data, aes(x = sqrt(Price_MEG))) +
+  geom_density() +
+  labs(title = "Density of Square Root Price of MEG",
+       x = "Square Root Price of MEG")
+
+inv_Price_MEG_plot <- ggplot(data, aes(x = 1 / Price_MEG)) +
+  geom_density() +
+  labs(title = "Density of Inverse Price of MEG",
+       x = "Inverse Price of MEG")
+
+inv_log_Price_MEG_plot <- ggplot(data, aes(x = 1 / log(Price_MEG))) +
+  geom_density() +
+  labs(title = "Density of Inverse Log Price of MEG",
+       x = "Inverse Log Price of MEG")
+
+# Create the caption with centered alignment
+caption <- ggdraw() + draw_label(
+  "Figure 2: Density plots for different transformations of Price of MEG.",
+   x = 1, hjust = 0.5, vjust = 1, size = 12)
+
+# Arrange the plots in a grid layout with the caption
+plot_grid(log_Price_MEG_plot, sqrt_Price_MEG_plot, inv_Price_MEG_plot, inv_log_Price_MEG_plot, caption,
+          ncol = 2, nrow = 3, rel_heights = c(1, 1, 0.1))
+```
+
+```{r, echo = FALSE}
+model_ls <- lm(Price_MEG ~., data = data[,-1])
+#summary(model_ls)
+par(mfrow = c(1, 2))
+qqnorm(model_ls$residuals, main = "Plot for Residuals")
+qqline(model_ls$residuals)
+hist(model_ls$residuals,breaks = 20)
+mtext("Figure 3: Diagnostics plots",
+      side = 1, line = 4, cex = 1.1)
+```
+
+
+As shown in Figure 2, after using log, square root, inverse transformation, and inverse log transformation, we found that all of them can not handle the skewness and multi-peaks of the response variable. And figure 3 also shows residuals are not normally distributed, so it is not appropriate to use linear regression model and we decided to use nonparametric regression for this dataset first.
+
+## Check the correlation between variables
+Before fitting a nonparametric regression model, we need to check the correlation between the response variable and the explanatory variables.
+
+
+```{r, echo = FALSE}
+# Check correlation between variables and plot the correlation plot with coefficients displayed
+corrplot(cor(data[, -1]), method = "color", type = "upper",
+         addCoef.col = "black", # Color of the correlation coefficients
+         number.cex = 0.8,      # Font size of the correlation coefficients
+         tl.col = "black",      # Color of the variable names
+         tl.srt = 45,           # Text rotation angle for variable names
+         tl.cex = 0.8,          # Font size of the variable names
+         diag = FALSE)          # Do not display diagonal elements
+# Add a caption below the plot
+mtext("Figure 4: Correlation plot with coefficients between variables",
+      side = 1, line = 4, cex = 1.1)
+
+```
+
+Figure 4 shows that the price of MEG is positively highly correlated with MEG profit and negatively related to MEG inventory, and has almost no correlation with the price of crude oil and coal. The result for MEG profit and MEG inventory aligns with our previous hypotheses. But for price of crude oil and coal is surpising, as we expected the price of MEG will be correlated with it.
+
+## Check multicollinearity
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+lm_model <- lm(Price_MEG ~ Price_crude_oil_coal + Upstream_MEG_Profit + MEG_Profit + MEG_operating_rate + Downstream_Profits + Downstream_Operating_Rate + Downstream_Inventory + MEG_Inventory,
+               data = data)
+
+vif_values <- vif(lm_model)
+vif_values
+```
+The results show that the VIF values are all smaller than 5. It indicates that the multicollinearity is not a potential big issue in this dataset, but still we need to be careful when interpreting the results.
+
+
+## Nonparametric local linear regression
+```{r}
+#options(np.messages=FALSE)
+
+set.seed(8888)
+bw <- npregbw(Price_MEG ~ Price_crude_oil_coal + Upstream_MEG_Profit + MEG_Profit + MEG_operating_rate + Downstream_Profits + Downstream_Operating_Rate + Downstream_Inventory + MEG_Inventory,
+              data = data, regtype = "ll", bwmethod = "cv.aic")
+np_local_lm <- npreg(bws = bw)
+summary(np_local_lm)
+
+result <- npsigtest(np_local_lm)
+
+```
+```{r}
+result
+```
+
+After fitting the nonparametric local linear regression model, the summary of the model shows the R-squared is 0.991, which raises the concern of over-fitting. We then performed the consistent nonparametric test of significance, we found that the p-value of the price of crude oil and coal, upstream MEG profit, MEG profit, MEG operating rate, Downstream Profits and Downstream Operating Rate are smaller than 0.05, which means they are significant. All the other variables are not significant according to the test.
+
+
+## Variable importance
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+
+# Random forest
+rf <- randomForest(Price_MEG ~ ., data = data[,-1], importance = T)
+varImpPlot(rf)
+title(sub = "Figure 5: Variable importance plot for random forest",
+      cex.sub = 1, line = 4)
+
+boosting <-  gbm(Price_MEG ~ ., data = data[,-1], distribution = "gaussian",
+                 n.trees = 10000, interaction.depth = 6, shrinkage = 0.03, bag.fraction = 0.8)
+summary(boosting)
+```
+We check the variable importance using random forest and boosting. Both results show that inventory and MEG profit are the 2 most important variables, followed by the Price of crude oil and coal. This results agree with the nonparametric local linear regression model that MEG profit and price of crude oil and coal are important variables, but inventory is not significant in the nonparametric local linear regression model.
+
+Overall, for the purpose of variable selection, if we would like to keep 2 variables, we would choose MEG profit and inventory. If we would like to keep 3 variables, we would choose MEG profit, inventory, and the price of crude oil and coal.
+
+## Generalized additive model
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+gam_model <- gam(Price_MEG ~  s(MEG_Profit) + s(MEG_Inventory)+s(Price_crude_oil_coal),
+                 data = data[,-1], family = Gamma(link = "log"))
+summary(gam_model)
+
+par(mfrow=c(1,3))
+# Plot for MEG_Profit
+plot(gam_model, select = 1, xlab = "MEG Profit", ylab = "Partial effect")
+# Plot for Inventory
+plot(gam_model, select = 2, xlab = "MEG Inventory", ylab = "Partial effect")
+plot(gam_model, select = 3, xlab = "Price_crude_oil_coal", ylab = "Partial effect")
+
+title(sub = "Figure 5: Marginal splines for Price crude oil coal and MEG Profit",
+      cex.sub = 1, line = 4)
+
+
+# qqnorm(resid(gam_model))
+# qqline(resid(gam_model))
+
+# # Construct a 3D plot
+# x1 <- seq(from = 200, to = 1000, by = 10)
+# x2 <- seq(from = -2000, to = 3000, by = 50)
+# x_grid <- data.frame(expand.grid(Price_crude_oil_coal = x1, MEG_Profit = x2))
+#
+# gam_pred <- predict(gam_model ,newdata = x_grid)
+# surface <-  matrix(gam_pred, nrow=length(x1))
+#
+# open3d()
+# persp3d(x = x1, y = x2,
+#         z = surface, theta = 30, phi = 30, expand = 0.5,
+#         col = "orange", xlab = "Price crude oil coal",
+#         ylab = "MEG Profit", zlab = "Predicted Price MEG")
+# points3d(data$Price_crude_oil_coal ~ data$MEG_Profit + data$Price_MEG, col="blue")
+```
+We fitted a generalized additive model with the Price of MEG as the response variable, and MEG profit,MEG Inventory and price of crude oil and coal as the explanatory variables. The summary of the model shows that the adjusted R-squared is 0.954, which is similar to the nonparametric local linear regression model.
+
+This partial effect plots in Figure 5 can show the relationships between the response variable and the explanatory variable, while accounting for the effect of the other explanatory variable.
+
+Both plots show that the Price of MEG increases as the MEG profit and Inventory increase. The plots show uncertainty in the fitted smooth function, which means that the relationship between the response variable and the explanatory variable is more complex than a linear relationship. And the estimated degree of freedom for the two variables are larger than 3, which means that the relationship between the response variable and the explanatory variable is non-linear.**这段话需要再改下**
+
+## Logistic regression
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+data_logistic <- data[-1,]
+data_logistic$newy <- ifelse(diff(data$Price_MEG) > 0, 1, 0)
+data_logistic$newy <- as.factor(data_logistic$newy)
+model_Log<- glm(newy ~., data=data_logistic[,-1],family =binomial)
+summary(model_Log)
+model_Log_step <- stepAIC(model_Log, direction = "both", criterion = "bic", trace = FALSE)
+summary(model_Log_step)
+```
+
+In financial markets, predicting the exact price movement of a particular asset can be a challenging task as it influenced by a complex range of factors. As a result, it can be more practical to focus on predicting the trend of growth or decline, rather than the exact price movement. One approach that could be used to predict the trend of growth or decline in price trend is logistic regression.
+
+The first thing we will need to convert our continuous response variable (MEG price) into a binary variable. This involves assigning a value of 1 to represent growth and 0 to represent decline.Then, after fitting the logistic model, we found that only three variables are significant. In order to improve the model's predictive power and reduce the risk of overfitting, we use the Akaike Information Criterion (AIC) method to perform variable selection.
+
+By applying the AIC method to the logistic regression model, we can identify that AIC increases from 323 to 317 and the selected five variables(Price_crude_oil_coal,MEG_Profit,MEG_operating_rate,Downstream_Profits and Downstream_Inventory) are all significant.
+
+
+# Model Evaluation
+
+After fitting the model, we need to compare which model has the best performance in prediction or classification.
+
+## One-step Cross validation for time series data
+When dealing with time series data, it is important to consider the temporal order of the data points. To evaluate the performance of a predictive model, we typically use cross-validation to divide the data into training and testing sets. However, in time series data, we cannot simply divide the data randomly as this would break the temporal order.
+
+Instead, one approach is to use one-step cross-validation, which involves sequentially dividing the data into training and testing sets. To do this, we start by using the first 70% of the data as the initial training set. We then predict the next value in the time series using this training set. And we increase training set by adding one true value and then predict the next value. We repeat this process by using the updated training set to predict the next value and continue this process until used all of the data used.
+
+By using this one-step cross-validation approach, we can evaluate the performance of our predictive model on data that is temporally similar to the data that it will encounter in the future. This can help us to determine how well our model will generalize to new, unseen data.
+
+```{r}
+getwd()
+knitr::include_graphics("cross.png",error=FALSE)
+```
+
+
+## MSE comparison between Generalized additive model and random forest
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+# random forest
+
+# Calculate the index to split the data
+n <- nrow(data)
+per <- 0.7
+split_index <- floor(per * n)
+df <- data[,-1]
+
+# Randomly split the data into training and testing sets
+rf_list <- list()
+set.seed(123)
+for (i in 1:( nrow(data)-split_index)  ) {
+     train_data <- df[1:split_index, ]
+     rf <- randomForest(Price_MEG ~ ., data = train_data, importance = T)
+     yhat <- predict(rf,newdata=df[(split_index + 1),-1])
+     split_index <- split_index+1
+     rf_list <- append(rf_list, yhat)
+}
+
+```
+
+
+```{r, include = FALSE, warning = FALSE, message = FALSE}
+# Generalized additive model
+
+# Calculate the index to split the data
+split_index <- floor(per * n)
+gam_list <- list()
+
+
+# Randomly split the data into training and testing sets
+set.seed(123)
+for (i in 1:(nrow(data)-split_index)){
+     train_data <- df[1:split_index, ]
+     gam_model <- gam(Price_MEG ~  s(MEG_Profit) + s(MEG_Inventory)+s(Price_crude_oil_coal),
+                 data = train_data , family = Gamma(link = "log"))
+     yhat <- predict(gam_model,newdata=df[split_index + 1,c(2,4,9)],type = "response")
+     split_index <- split_index+1
+     gam_list <- append(gam_list, yhat)
+}
+
+```
+
+
+```{r, echo = FALSE}
+rf_predict <- as.numeric(unlist(rf_list))
+rf_predict_all <- c(df[1:floor(per * n),]$Price_MEG,rf_predict)
+gam_predict <- as.numeric(unlist(gam_list))
+gam_predict_all <- c(df[1:floor(per * n),]$Price_MEG,gam_predict)
+
+ggplot(data, aes(x=date)) +
+  geom_line(aes(y = gam_predict_all), color = "red")+
+  geom_line(aes(y = rf_predict_all), color = "black")+
+  geom_line(aes(y = Price_MEG), color = "blue")+
+  labs(title = "Comparsion of predicted price between two models", x = "Date", y = "MEG price")
+```
+帮我加个 legend 和统一的标题，坐标轴你看蓝色这段时间要不要少一点？
+
+```{r}
+mse_rf <- mean((rf_predict-df[(floor(per * n)+1):nrow(data),]$Price_MEG)^2)
+mse_gam <- mean((gam_predict-df[(floor(per * n)+1):nrow(data),]$Price_MEG)^2)
+mse_rf
+mse_gam
+```
+
+Based on the results of our analysis, we can see from Figure XX that both the generalized additive model and random forest model were able to fit the response variable (MEG price) to some extent. Although the trends in the predicted values are not exactly the same as the true values, they are relatively similar.
+
+To better compare the performance of the two models, we calculated the mean squared error (MSE) between the predicted values and the true values. Our results showed that the generalized additive model had a smaller MSE than the random forest model. This suggests that the generalized additive model was better at accurately predicting the MEG price trend.
+
+In summary, based on both the graph and the MSE results, we can conclude that the generalized additive model outperformed the random forest model in predicting the MEG price trend.
+
+
+## Logloss evaluation of logistic regression
+
+```{r}
+library(Metrics)
+# Calculate the index to split the data
+split_index <- floor(per * n)
+lg_list <- list()
+data_logistic <- data_logistic[,-1]
+
+# Randomly split the data into training and testing sets
+set.seed(123)
+for (i in 1:(nrow(data)-split_index)){
+     train_data <- data_logistic[1:split_index,]
+     lg_model <- glm(formula = newy ~  Price_crude_oil_coal+MEG_Profit + MEG_operating_rate + Downstream_Profits +    
+                       Downstream_Inventory, family = binomial, data = train_data)
+     yhat <- predict(lg_model,newdata=data_logistic[split_index + 1,c(2,4,5,6,8)],type = "response")
+     split_index <- split_index+1
+     lg_list <- append(lg_list, yhat)
+}
+
+logLoss(as.numeric(data_logistic[177:251,][,10])-1, as.numeric(unlist(lg_list))[1:75])
+```
+
+```{r}
+binary_vec <- ifelse(as.numeric(unlist(lg_list))[1:75] > 0.5, 1, 0)
+table(as.numeric(data_logistic[177:251,][,10])-1,binary_vec)
+misclassification_rate <- (7+12)/(27+12+7+29)
+misclassification_rate
+```
+
+The logistic regression model we used in our analysis was evaluated using two common metrics, namely the misclassification rate and the log loss. The log loss of the model was found to be 0.63, which falls in the range of 0 to infinity. A lower log loss value indicates better performance of the model. Although the log loss value of our model is not very close to 0, it is still small, which suggests that the model is performing reasonably well.
+
+Furthermore, we found that the misclassification rate of our model is 0.25, meaning that 25% of the predicted outcomes are incorrect. This implies that the model is incorrectly predicting the class of one out of every four observations. However, it is important to note that in financial markets, accurately predicting the direction of the market movement is very challenging, and achieving an accuracy rate of 75% is considered good. Hence, our logistic regression model's accuracy rate of 75% can be deemed satisfactory for predicting the trend growth or decline in the financial market.
+
+
+# Conclusion
+
+
+## Interpretation between predicators and response variables
+
+| Model                         | Significant variables or variable importance |
+|-------------------------------|----------------------------------------------|
+| Nonparametric  regression     | Price_crude_oil_coal; MEG_Profit             |
+|                               | Upstream_MEG_Profit; MMEG_operating_rate     | 
+|                               | Downstream_Profits; Downstream_Operating_Rate|
+|                               |                                              |
+| Random Forest                 | Price_crude_oil_coal;MEG_Profit;MEG Inventory|
+| Boosting                      | 这个你来加，图我看不太懂                     |
+| Generalized additive model    | Price_crude_oil_coal;MEG_Profit;MEG Inventory|
+|                               |                                              |
+| Logistic regression           | Price_crude_oil_coal; MEG_Profit;            |
+|                               | MEG_operating_rate; Downstream_Profits       |
+|                               | Downstream_Inventory                         |
+
+
+The figure indicates that across five different models, two variables, namely "Price_crude_oil_coal" and "MEG_Profit", consistently show significance or importance. Moreover, the variable "MEG Inventory" displays significance or importance in three models, namely "Random Forest", "Boosting", and "GAM". Notably, the "GAM" model with significant three variables, namely "Price_crude_oil_coal", "MEG_Profit", and "MEG Inventory", has a large R-square of 0.95. This indicates that these three variables have a substantial impact on the MEG price.
+
+The statistical results also confirms our previous hypothesis from the fundamental perspective：
+1.As the price of crude oil, coal is a measure of the cost of MEG, the price will be higher when the cost is higher.     
+2.we expect the price will be higher when MEG profit is higher. As for the MEG profit, which is the overall reflection of supply and demand performance.The better performance(strong demand or short supply),the higher profit, therefore, we expect the price will be higher when MEG profit is highers for the MEG profit, which is the overall reflection of supply and demand performance.The better performance(strong demand or short supply),the higher profit.
+3.We also expect that the price of MEG will be negatively related to the inventory and MEG_operating_rate, as both of them are measures of the supply of MEG, and the price will be lower when the supply is higher.     
+
+The previous correlation plot shows that the price of MEG is positively highly correlated with MEG profit and negatively related to MEG inventory.
+
+Therefore, based on the statistical analysis of the models and variables, we can conclude that the hypothesis based on the fundamental perspective has been supported.
+
+
+## Prediction of response variables(Model Selection)
+
+**When response variable is continuous**
+When evaluating different models for our dataset, we found that linear regression was not an appropriate choice because the response variable and residuals were not normally distributed. Nonparametric local linear regression, while it has a high R-square value close to 0.99, raised concerns about overfitting and has some insignificant variables. Furthermore, it required a large dataset.
+
+In comparison, the random forest model has a larger Mean Squared Error (MSE) than the Generalized Additive Model (GAM), which was our preferred choice. The GAM had a smaller MSE, all significant variables, and a large R-square value. Moreover, the GAM was more transparent and easier to interpret than the black box nature of the random forest model.
+
+Therefore, we can conclude that the Generalized Additive Model is the best model for our dataset, as it had strong predictive power, all significant variables, and good interpretability.
+
+**When response variable is binary**
+Predicting the exact movement of financial markets can be very difficult, so it may be more useful to focus on predicting the general trend of growth or decline. 
+
+Our logistic model has an misclassification rate of 0.25 and a log loss of 0.63, which is not considered to be a strong model. However, given the inherent unpredictability of financial markets, this model may still have some value. In summary, while our model may not be optimal, it can still be considered a reasonable approach for predicting market trends.
+
+
+
+
